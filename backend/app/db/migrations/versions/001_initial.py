@@ -64,9 +64,11 @@ def upgrade() -> None:
 
     op.create_table(
         "user_roles",
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), primary_key=True),
-        sa.Column("role_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("roles.id"), primary_key=True),
-        sa.Column("department_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("departments.id"), primary_key=True, nullable=True),
+        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("role_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("roles.id"), nullable=False),
+        sa.Column("department_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("departments.id"), nullable=True),
+        sa.UniqueConstraint("user_id", "role_id", "department_id", name="uq_user_roles_user_id_role_id_department_id"),
     )
 
     op.create_table(

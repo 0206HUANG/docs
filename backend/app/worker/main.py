@@ -1,5 +1,6 @@
 from arq import create_pool
 from arq.connections import RedisSettings
+from arq.cron import cron
 
 from app.config import settings
 from app.worker.tasks import (
@@ -55,8 +56,8 @@ class WorkerSettings:
     retry_jobs = True
     max_tries = 3
     cron_jobs = [
-        {"name": "poll_all_accounts", "coroutine": poll_all_accounts, "minute": {0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55}},
-        {"name": "daily_summary", "coroutine": daily_summary, "hour": 8, "minute": 0},
-        {"name": "weekly_summary", "coroutine": weekly_summary, "weekday": 0, "hour": 8, "minute": 0},
-        {"name": "monthly_summary", "coroutine": monthly_summary, "day": 1, "hour": 8, "minute": 0},
+        cron(poll_all_accounts, minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55}),
+        cron(daily_summary, hour=8, minute=0),
+        cron(weekly_summary, weekday=0, hour=8, minute=0),
+        cron(monthly_summary, day=1, hour=8, minute=0),
     ]
