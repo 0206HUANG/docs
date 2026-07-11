@@ -10,6 +10,7 @@ from app.db.models.workflow import (
     Notification, AuditLog, SummaryReport, EmailListRule,
 )
 from app.db.models.campaign import Campaign, CampaignRecipient
+from app.db.models.outbox import ScheduledEmail
 
 __all__ = [
     "Tenant", "Department",
@@ -20,4 +21,5 @@ __all__ = [
     "SensitiveWord", "EmailTypeStrategy", "Ticket", "TicketReply",
     "Notification", "AuditLog", "SummaryReport", "EmailListRule",
     "Campaign", "CampaignRecipient",
+    "ScheduledEmail",
 ]

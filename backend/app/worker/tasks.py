@@ -259,3 +259,10 @@ async def run_campaigns(ctx: dict) -> None:
     async with AsyncSessionLocal() as db:
         from app.services.campaign import run_due_recipients
         await run_due_recipients(db)
+
+
+async def send_scheduled(ctx: dict) -> None:
+    """Cron (every minute): dispatch due scheduled emails."""
+    async with AsyncSessionLocal() as db:
+        from app.services.outbox import send_due_scheduled
+        await send_due_scheduled(db)

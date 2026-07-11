@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     STORAGE_PATH: str = "./storage"
     MAX_UPLOAD_SIZE_MB: int = 50
 
+    # Public base URL (used to build open-tracking pixel links in outbound mail)
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
+
     # Email notification for alerts
     ADMIN_ALERT_EMAIL: str = ""
 

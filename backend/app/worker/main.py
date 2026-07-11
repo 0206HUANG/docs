@@ -12,6 +12,7 @@ from app.worker.tasks import (
     process_email,
     run_campaigns,
     send_reply,
+    send_scheduled,
 )
 
 
@@ -51,7 +52,7 @@ async def monthly_summary(ctx):
 
 class WorkerSettings:
     functions = [poll_inbox, process_email, send_reply, generate_summary, poll_all_accounts,
-                 ingest_document, escalate_tickets, run_campaigns,
+                 ingest_document, escalate_tickets, run_campaigns, send_scheduled,
                  daily_summary, weekly_summary, monthly_summary]
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
     max_jobs = settings.WORKER_MAX_JOBS
@@ -62,6 +63,7 @@ class WorkerSettings:
         cron(poll_all_accounts, minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55}),
         cron(escalate_tickets, minute={0, 30}),
         cron(run_campaigns, minute={15, 45}),
+        cron(send_scheduled),  # every minute (second=0)
         cron(daily_summary, hour=8, minute=0),
         cron(weekly_summary, weekday=0, hour=8, minute=0),
         cron(monthly_summary, day=1, hour=8, minute=0),
