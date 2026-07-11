@@ -157,3 +157,24 @@ class ResumeProfile(Base, TimestampMixin):
     match_notes: Mapped[str | None] = mapped_column(Text)
     llm_model: Mapped[str | None] = mapped_column(String(100))
     source: Mapped[str] = mapped_column(String(20), default="attachment")  # attachment | body
+
+
+class CustomerProfile(Base, TimestampMixin):
+    """Aggregated profile for an external correspondent (customer / supplier),
+    keyed by their email address. Powers history-aware AI replies."""
+    __tablename__ = "customer_profiles"
+    __table_args__ = (UniqueConstraint("tenant_id", "email"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(200), nullable=False)
+    name: Mapped[str | None] = mapped_column(String(200))
+    company: Mapped[str | None] = mapped_column(String(200))
+    email_count: Mapped[int] = mapped_column(Integer, default=0)
+    first_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(20), default="active")  # active/lead/customer/complaint
+    importance: Mapped[int] = mapped_column(SmallInteger, default=1)
+    tags: Mapped[list] = mapped_column(JSONB, default=list)
+    summary: Mapped[str | None] = mapped_column(Text)  # optional AI-written profile blurb
+    notes: Mapped[str | None] = mapped_column(Text)

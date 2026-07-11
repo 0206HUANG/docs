@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import auth, accounts, emails, kb, tickets, notifications, settings, reports, users, resumes
+from app.api.v1 import auth, accounts, emails, kb, tickets, notifications, settings, reports, users, resumes, customers
 
 router = APIRouter()
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -13,3 +13,4 @@ router.include_router(notifications.router, prefix="/notifications", tags=["noti
 router.include_router(settings.router, prefix="/settings", tags=["settings"])
 router.include_router(reports.router, prefix="/reports", tags=["reports"])
 router.include_router(resumes.router, prefix="/resumes", tags=["resumes"])
+router.include_router(customers.router, prefix="/customers", tags=["customers"])

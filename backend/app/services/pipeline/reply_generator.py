@@ -23,6 +23,9 @@ Rules:
 Knowledge base context:
 {context}
 
+Prior correspondence with this sender (maintain continuity — do NOT re-ask for information already provided, do NOT contradict earlier replies):
+{history}
+
 Sender email:
 From: {from_addr}
 Subject: {subject}
@@ -38,6 +41,7 @@ async def generate_reply(
     tone: str,
     context_chunks: list[dict],
     model: str | None = None,
+    history: str = "",
 ) -> tuple[str, str]:
     """
     Generate reply text. Returns (reply_text, llm_model_used).
@@ -49,6 +53,7 @@ async def generate_reply(
         language=language,
         tone_instruction=tone_instruction,
         context=context_text,
+        history=history or "(无历史往来记录)",
         from_addr=from_addr,
         subject=subject or "(no subject)",
         body=(body or "")[:2000],

@@ -122,6 +122,13 @@ async def process_email(
         except Exception as e:
             logger.error("Resume parse failed email=%s: %s", email.id, e)
 
+    # ── 3b. Customer profile (aggregate this correspondent) ─────────────────
+    try:
+        from app.services.pipeline.customer import upsert_customer
+        await upsert_customer(db, tenant_id, email.from_addr, email.from_name)
+    except Exception as e:
+        logger.warning("Customer upsert failed email=%s: %s", email.id, e)
+
     # ── 3. RAG retrieval ────────────────────────────────────────────────────
     kb_group_repo = KBGroupRepo(db, tenant_id)
     kb_chunk_repo = KBChunkRepo(db, tenant_id)
@@ -175,6 +182,8 @@ async def process_email(
 
     # ── 5. Reply generation ─────────────────────────────────────────────────
     try:
+        from app.services.pipeline.customer import build_history_context
+        history = await build_history_context(db, tenant_id, email.from_addr, email.id)
         reply_text, reply_model = await generate_reply(
             llm=llm,
             subject=email.subject,
@@ -184,6 +193,7 @@ async def process_email(
             tone=tone,
             context_chunks=context_chunks,
             model=llm_config.get("model"),
+            history=history,
         )
     except Exception as e:
         logger.error("Reply generation failed email=%s: %s", email.id, e)
