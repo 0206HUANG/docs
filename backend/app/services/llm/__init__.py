@@ -23,8 +23,23 @@ def get_llm_provider(llm_config: dict) -> BaseLLMProvider:
 
 
 def get_embed_provider(llm_config: dict) -> BaseLLMProvider:
-    """Embedding always uses an OpenAI-compatible provider."""
+    """
+    Build an embedding provider.
+
+    OpenAI (and compatible gateways) expose an embeddings endpoint, so they are
+    used directly. DeepSeek and Anthropic do NOT provide embeddings — for those,
+    and for explicit provider=="local", fall back to the API-free local hash
+    embedder so retrieval still works. An explicit embed_config overrides all.
+    """
     embed_config = llm_config.get("embed_config", llm_config)
+    embed_provider = embed_config.get(
+        "embed_provider", llm_config.get("provider", "openai")
+    )
+
+    if embed_provider in ("deepseek", "anthropic", "local"):
+        from app.services.llm.local_embed import LocalHashEmbedProvider
+        return LocalHashEmbedProvider()
+
     api_key_enc = embed_config.get("embed_api_key_enc", embed_config.get("api_key_enc", ""))
     try:
         api_key = decrypt_value(api_key_enc) if api_key_enc else ""

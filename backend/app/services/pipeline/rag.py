@@ -40,11 +40,14 @@ async def retrieve_context(
         logger.error("Embedding failed: %s", e)
         return [], []
 
+    # Semantic embedders (OpenAI) score higher than the lexical local fallback;
+    # let each provider advertise its own floor via embed_min_score.
+    min_score = getattr(embed_provider, "embed_min_score", 0.65)
     chunks = await kb_chunk_repo.similarity_search(
         embedding=embedding,
         group_ids=group_ids,
         top_k=top_k,
-        min_score=0.65,
+        min_score=min_score,
     )
 
     result = [{"content": c.content, "score": score, "id": str(c.id)} for c, score in chunks]

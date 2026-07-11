@@ -11,19 +11,51 @@ from app.services.llm.base import BaseLLMProvider
 
 logger = logging.getLogger(__name__)
 
+import re
+
 CHUNK_SIZE = 500  # tokens approx
 CHUNK_OVERLAP = 50
+CJK_MAX_CHARS = 260  # chars per chunk for CJK/space-poor text
+CJK_OVERLAP = 40
+
+_SENT_SPLIT = re.compile(r"(?<=[。！？!?；;\n])")
 
 
 def _split_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
-    """Simple word-boundary chunker."""
+    """
+    Chunk text for embedding. Latin/space-rich text is split on word
+    boundaries; CJK or space-poor text is split on sentence punctuation and
+    packed to ~CJK_MAX_CHARS, since ``str.split()`` would collapse an entire
+    Chinese paragraph into a single unusable chunk.
+    """
     words = text.split()
-    chunks = []
-    i = 0
-    while i < len(words):
-        chunk_words = words[i: i + chunk_size]
-        chunks.append(" ".join(chunk_words))
-        i += chunk_size - overlap
+    # Heuristic: if words are on average long, the text has few spaces (CJK).
+    space_poor = len(words) < len(text) / 6
+
+    if not space_poor:
+        chunks = []
+        i = 0
+        while i < len(words):
+            chunks.append(" ".join(words[i: i + chunk_size]))
+            i += chunk_size - overlap
+        return [c for c in chunks if c.strip()]
+
+    # CJK path: sentence-aware packing
+    pieces = [p.strip() for p in _SENT_SPLIT.split(text) if p.strip()]
+    chunks: list[str] = []
+    cur = ""
+    for p in pieces:
+        if len(cur) + len(p) <= CJK_MAX_CHARS:
+            cur += p
+        else:
+            if cur:
+                chunks.append(cur)
+            while len(p) > CJK_MAX_CHARS:
+                chunks.append(p[:CJK_MAX_CHARS])
+                p = p[CJK_MAX_CHARS - CJK_OVERLAP:]
+            cur = p
+    if cur:
+        chunks.append(cur)
     return [c for c in chunks if c.strip()]
 
 

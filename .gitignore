@@ -17,6 +17,11 @@ out/
 *.sqlite
 storage/
 
+# Secrets — never commit API keys
+deepseek.txt
+*.key
+*.secret
+
 # IDE
 .vscode/
 .idea/
