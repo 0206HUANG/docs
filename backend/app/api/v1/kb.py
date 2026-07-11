@@ -20,7 +20,10 @@ async def list_groups(current_user: CurrentUser, db: DB):
     result = await db.execute(
         select(KBGroup).where(KBGroup.tenant_id == current_user.tenant_id)
     )
-    return [{"id": str(g.id), "name": g.name, "category": g.category, "is_active": g.is_active}
+    return [{"id": str(g.id), "name": g.name, "category": g.category,
+             "positioning": g.positioning or [], "email_types": g.email_types or [],
+             "is_active": g.is_active,
+             "created_at": g.created_at.isoformat() if g.created_at else None}
             for g in result.scalars().all()]
 
 

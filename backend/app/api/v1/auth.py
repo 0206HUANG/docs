@@ -16,6 +16,18 @@ from app.db.models import User, UserRole
 router = APIRouter()
 
 
+@router.get("/tenant")
+async def lookup_tenant(domain: str, db: DB):
+    """Resolve tenant domain → id (public endpoint for login UI)."""
+    from app.db.models import Tenant
+    result = await db.execute(select(Tenant).where(Tenant.domain == domain, Tenant.is_active == True))
+    tenant = result.scalar_one_or_none()
+    if not tenant:
+        from app.core.exceptions import NotFoundError
+        raise NotFoundError("Tenant not found")
+    return {"tenant_id": str(tenant.id), "name": tenant.name}
+
+
 class LoginRequest(BaseModel):
     email: str
     password: str

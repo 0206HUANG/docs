@@ -23,13 +23,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  tenantByDomain: (domain: string) =>
+    request<{ tenant_id: string; name: string }>(`/auth/tenant?domain=${encodeURIComponent(domain)}`),
+
   login: (email: string, password: string, tenant_id: string) =>
     request<{ access_token: string; refresh_token: string }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password, tenant_id }),
     }),
 
-  me: () => request<{ id: string; email: string; name: string; roles: string[] }>("/auth/me"),
+  me: () => request<{ id: string; email: string; name: string; tenant_id: string; roles: string[] }>("/auth/me"),
 
   emails: {
     list: (params?: { account_id?: string; email_type?: string; limit?: number; offset?: number }) => {
@@ -61,7 +64,42 @@ export const api = {
     readAll: () => request("/notifications/read-all", { method: "POST" }),
   },
 
-  stats: () => request<{ emails_today: number; open_tickets: number }>("/reports/stats"),
+  stats: () => request<{
+    emails_today: number;
+    emails_week: number;
+    open_tickets: number;
+    auto_sent_week: number;
+    high_risk_week: number;
+  }>("/reports/stats"),
+
+  kb: {
+    groups: () => request<KBGroup[]>("/kb/groups"),
+    createGroup: (data: { name: string; category: string; positioning: string[]; email_types: string[] }) =>
+      request<KBGroup>("/kb/groups", { method: "POST", body: JSON.stringify(data) }),
+    addManual: (data: { group_id: string; title: string; content: string }) =>
+      request("/kb/documents/manual", { method: "POST", body: JSON.stringify(data) }),
+    docs: (group_id: string) => request<KBDocument[]>(`/kb/documents?group_id=${group_id}`),
+  },
+
+  settings: {
+    getSensitiveWords: () => request<SensitiveWord[]>("/settings/sensitive-words"),
+    addSensitiveWord: (word: string, category: string) =>
+      request("/settings/sensitive-words", { method: "POST", body: JSON.stringify({ word, category }) }),
+    deleteSensitiveWord: (id: string) =>
+      request(`/settings/sensitive-words/${id}`, { method: "DELETE" }),
+    getStrategies: () => request<EmailStrategy[]>("/settings/strategies"),
+    updateStrategy: (email_type: string, data: { send_strategy: string; tone: string }) =>
+      request(`/settings/strategies/${email_type}`, { method: "PUT", body: JSON.stringify(data) }),
+    getLLM: () => request<{ provider: string; model: string }>("/settings/llm"),
+    saveLLM: (data: { provider: string; api_key_enc: string; model: string }) =>
+      request("/settings/llm", { method: "PUT", body: JSON.stringify(data) }),
+  },
+
+  createAccount: (data: {
+    email_address: string; display_name: string; provider: string;
+    imap_host: string; imap_port: number; smtp_host: string; smtp_port: number;
+    username: string; password: string; positioning: string;
+  }) => request<Account>("/accounts", { method: "POST", body: JSON.stringify(data) }),
 };
 
 export interface EmailSummary {
@@ -119,4 +157,37 @@ export interface Notification {
   body: string | null;
   is_read: boolean;
   created_at: string;
+}
+
+export interface KBGroup {
+  id: string;
+  name: string;
+  category: string;
+  positioning: string[];
+  email_types: string[];
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface KBDocument {
+  id: string;
+  title: string;
+  source_type: string;
+  status: string;
+  chunk_count: number;
+  created_at: string;
+}
+
+export interface SensitiveWord {
+  id: string;
+  word: string;
+  category: string;
+  is_active: boolean;
+}
+
+export interface EmailStrategy {
+  email_type: string;
+  send_strategy: string;
+  tone: string;
+  is_active: boolean;
 }

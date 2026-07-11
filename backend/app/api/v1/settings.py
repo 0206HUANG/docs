@@ -82,6 +82,25 @@ async def add_sensitive_word(body: dict, current_user: CurrentUser, db: DB):
     return {"id": str(w.id)}
 
 
+@router.delete("/sensitive-words/{word_id}")
+async def delete_sensitive_word(word_id: str, current_user: CurrentUser, db: DB):
+    _require_admin(current_user)
+    import uuid as _uuid
+    result = await db.execute(
+        select(SensitiveWord).where(
+            SensitiveWord.id == _uuid.UUID(word_id),
+            SensitiveWord.tenant_id == current_user.tenant_id,
+        )
+    )
+    word = result.scalar_one_or_none()
+    if not word:
+        from app.core.exceptions import NotFoundError
+        raise NotFoundError("SensitiveWord")
+    await db.delete(word)
+    await db.commit()
+    return {"ok": True}
+
+
 @router.get("/llm")
 async def get_llm_config(current_user: CurrentUser, db: DB):
     _require_admin(current_user)

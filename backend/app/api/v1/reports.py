@@ -20,20 +20,43 @@ async def stats(current_user: CurrentUser, db: DB):
     from datetime import datetime, timezone, timedelta
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today - timedelta(days=today.weekday())
+    tid = current_user.tenant_id
 
-    total_today = (await db.execute(
+    emails_today = (await db.execute(
         select(func.count(Email.id))
-        .where(Email.tenant_id == current_user.tenant_id, Email.received_at >= today)
+        .where(Email.tenant_id == tid, Email.received_at >= today)
+    )).scalar_one()
+
+    emails_week = (await db.execute(
+        select(func.count(Email.id))
+        .where(Email.tenant_id == tid, Email.received_at >= week_start)
     )).scalar_one()
 
     open_tickets = (await db.execute(
         select(func.count(Ticket.id))
-        .where(Ticket.tenant_id == current_user.tenant_id, Ticket.status.in_(["open", "claimed"]))
+        .where(Ticket.tenant_id == tid, Ticket.status.in_(["open", "claimed"]))
+    )).scalar_one()
+
+    auto_sent = (await db.execute(
+        select(func.count(EmailClassification.id))
+        .join(Email, EmailClassification.email_id == Email.id)
+        .where(Email.tenant_id == tid, Email.received_at >= week_start,
+               EmailClassification.has_sensitive == False)
+    )).scalar_one()
+
+    high_risk = (await db.execute(
+        select(func.count(EmailClassification.id))
+        .join(Email, EmailClassification.email_id == Email.id)
+        .where(Email.tenant_id == tid, Email.received_at >= week_start,
+               EmailClassification.has_sensitive == True)
     )).scalar_one()
 
     return {
-        "emails_today": total_today,
+        "emails_today": emails_today,
+        "emails_week": emails_week,
         "open_tickets": open_tickets,
+        "auto_sent_week": auto_sent,
+        "high_risk_week": high_risk,
     }
 
 
