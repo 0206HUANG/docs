@@ -5,7 +5,7 @@ from app.api.deps import CurrentUser, DB
 from app.core.exceptions import PermissionError
 from app.core.permissions import RoleName, role_level
 from app.core.security import encrypt_value
-from app.db.models import EmailTypeStrategy, SensitiveWord
+from app.db.models import EmailListRule, EmailTypeStrategy, SensitiveWord
 
 router = APIRouter()
 
@@ -97,6 +97,61 @@ async def delete_sensitive_word(word_id: str, current_user: CurrentUser, db: DB)
         from app.core.exceptions import NotFoundError
         raise NotFoundError("SensitiveWord")
     await db.delete(word)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/list-rules")
+async def list_email_rules(current_user: CurrentUser, db: DB):
+    _require_admin(current_user)
+    result = await db.execute(
+        select(EmailListRule)
+        .where(EmailListRule.tenant_id == current_user.tenant_id)
+        .order_by(EmailListRule.created_at.desc())
+    )
+    return [
+        {"id": str(r.id), "list_type": r.list_type, "match_type": r.match_type,
+         "value": r.value, "reason": r.reason, "is_active": r.is_active}
+        for r in result.scalars().all()
+    ]
+
+
+@router.post("/list-rules")
+async def add_email_rule(body: dict, current_user: CurrentUser, db: DB):
+    _require_admin(current_user)
+    if body.get("list_type") not in ("black", "white"):
+        from app.core.exceptions import ValidationError
+        raise ValidationError("list_type must be 'black' or 'white'")
+    if not body.get("value"):
+        from app.core.exceptions import ValidationError
+        raise ValidationError("value is required")
+    r = EmailListRule(
+        tenant_id=current_user.tenant_id,
+        list_type=body["list_type"],
+        match_type=body.get("match_type", "email"),
+        value=body["value"].strip().lower(),
+        reason=body.get("reason"),
+    )
+    db.add(r)
+    await db.commit()
+    return {"id": str(r.id)}
+
+
+@router.delete("/list-rules/{rule_id}")
+async def delete_email_rule(rule_id: str, current_user: CurrentUser, db: DB):
+    _require_admin(current_user)
+    import uuid as _uuid
+    result = await db.execute(
+        select(EmailListRule).where(
+            EmailListRule.id == _uuid.UUID(rule_id),
+            EmailListRule.tenant_id == current_user.tenant_id,
+        )
+    )
+    r = result.scalar_one_or_none()
+    if not r:
+        from app.core.exceptions import NotFoundError
+        raise NotFoundError("Rule")
+    await db.delete(r)
     await db.commit()
     return {"ok": True}
 

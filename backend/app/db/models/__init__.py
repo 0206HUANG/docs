@@ -7,7 +7,7 @@ from app.db.models.email import (
 from app.db.models.kb import KBGroup, KBDocument, KBChunk, AssetLibrary
 from app.db.models.workflow import (
     SensitiveWord, EmailTypeStrategy, Ticket, TicketReply,
-    Notification, AuditLog, SummaryReport,
+    Notification, AuditLog, SummaryReport, EmailListRule,
 )
 
 __all__ = [
@@ -17,5 +17,5 @@ __all__ = [
     "EmailClassification", "EmailReply", "ResumeProfile",
     "KBGroup", "KBDocument", "KBChunk", "AssetLibrary",
     "SensitiveWord", "EmailTypeStrategy", "Ticket", "TicketReply",
-    "Notification", "AuditLog", "SummaryReport",
+    "Notification", "AuditLog", "SummaryReport", "EmailListRule",
 ]

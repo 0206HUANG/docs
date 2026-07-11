@@ -13,6 +13,7 @@ from app.services.pipeline.classifier import classify_email
 from app.services.pipeline.rag import retrieve_context
 from app.services.pipeline.reply_generator import generate_reply
 from app.services.pipeline.router import decide_strategy
+from app.services.pipeline.phishing import detect_phishing
 from app.services.pipeline.sensitive import check_sensitive_words
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,31 @@ async def process_email(
     tenant_id = email.tenant_id
     audit = AuditLogRepo(db, tenant_id)
     sw_repo = SensitiveWordRepo(db, tenant_id)
+
+    # ── 0. Black/white list + phishing gate (before any LLM call) ───────────
+    list_verdict = await _check_lists(db, email, tenant_id)
+    if list_verdict == "black":
+        await audit.log(email.id, "blacklisted", detail={"from": email.from_addr})
+        await _save_classification(db, email, tenant_id, email_type="spam",
+                                   language="zh", urgency=1, has_sensitive=False, sensitive_words=[])
+        await db.commit()
+        return
+    trusted = list_verdict == "white"
+
+    if not trusted:
+        att_names = await _attachment_names(db, email.id)
+        is_phish, phish_reasons = detect_phishing(
+            email.from_addr, email.from_name, email.subject, email.body_text, att_names
+        )
+        if is_phish:
+            await audit.log(email.id, "phishing_blocked", detail={"reasons": phish_reasons})
+            await _save_classification(db, email, tenant_id, email_type="spam",
+                                       language="zh", urgency=3, has_sensitive=True,
+                                       sensitive_words=phish_reasons)
+            await _create_ticket(db, email, account, reason="phishing",
+                                 title=f"[钓鱼风险] {email.subject or '无标题'}", priority=3)
+            await db.commit()
+            return
 
     # ── 1. Sensitive word check (highest priority) ──────────────────────────
     full_text = f"{email.subject or ''} {email.body_text or ''} {email.body_html or ''}"
@@ -310,3 +336,41 @@ async def _parse_resume(db, email, account, llm, llm_config, audit) -> None:
         "match_score": parsed.get("match_score"),
         "source": source,
     })
+
+
+async def _check_lists(db, email, tenant_id) -> str | None:
+    """Return 'black' / 'white' / None for the sender against list rules."""
+    from sqlalchemy import select
+
+    from app.db.models import EmailListRule
+
+    sender = (email.from_addr or "").strip().lower()
+    domain = sender.split("@")[-1] if "@" in sender else ""
+
+    result = await db.execute(
+        select(EmailListRule).where(
+            EmailListRule.tenant_id == tenant_id,
+            EmailListRule.is_active == True,
+        )
+    )
+    rules = result.scalars().all()
+
+    def _hit(r) -> bool:
+        val = (r.value or "").strip().lower()
+        return (r.match_type == "email" and val == sender) or (r.match_type == "domain" and val == domain)
+
+    # blacklist wins over whitelist
+    if any(_hit(r) for r in rules if r.list_type == "black"):
+        return "black"
+    if any(_hit(r) for r in rules if r.list_type == "white"):
+        return "white"
+    return None
+
+
+async def _attachment_names(db, email_id) -> list[str]:
+    from sqlalchemy import select
+
+    from app.db.models import EmailAttachment
+
+    result = await db.execute(select(EmailAttachment).where(EmailAttachment.email_id == email_id))
+    return [a.filename for a in result.scalars().all()]

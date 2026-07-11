@@ -20,6 +20,19 @@ class SensitiveWord(Base, TimestampMixin):
     tenant: Mapped["Tenant | None"] = relationship("Tenant", back_populates="sensitive_words", lazy="raise")
 
 
+class EmailListRule(Base, TimestampMixin):
+    """Sender black/white list entry (by full email or domain)."""
+    __tablename__ = "email_list_rules"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
+    list_type: Mapped[str] = mapped_column(String(10), nullable=False)  # black | white
+    match_type: Mapped[str] = mapped_column(String(10), default="email")  # email | domain
+    value: Mapped[str] = mapped_column(String(200), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(200))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class EmailTypeStrategy(Base):
     __tablename__ = "email_type_strategies"
 
