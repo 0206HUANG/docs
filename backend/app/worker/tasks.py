@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -9,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.db.base import AsyncSessionLocal
-from app.db.models import Email, EmailAccount, EmailReply, Tenant
+from app.db.models import Email, EmailAccount, EmailAttachment, EmailReply, Tenant
 from app.services.mail import get_mail_provider
 from app.services.mail.base import OutboundEmail
 
@@ -91,6 +92,31 @@ async def poll_inbox(ctx: dict, account_id: str) -> None:
                 db.add(email)
                 await db.flush()
                 new_count += 1
+
+                # Persist attachments (needed for resume parsing / asset use)
+                for att in raw.attachments:
+                    data = att.get("data") or b""
+                    storage_dir = os.path.join(
+                        settings.STORAGE_PATH, str(account.tenant_id), "attachments"
+                    )
+                    os.makedirs(storage_dir, exist_ok=True)
+                    safe_name = (att.get("filename") or "attachment").replace("/", "_").replace("\\", "_")
+                    fpath = os.path.join(storage_dir, f"{email.id}_{safe_name}")
+                    try:
+                        with open(fpath, "wb") as fh:
+                            fh.write(data)
+                    except Exception as e:
+                        logger.warning("Failed to store attachment %s: %s", safe_name, e)
+                        continue
+                    db.add(EmailAttachment(
+                        email_id=email.id,
+                        tenant_id=account.tenant_id,
+                        filename=safe_name,
+                        content_type=att.get("content_type"),
+                        size_bytes=len(data),
+                        storage_path=fpath,
+                    ))
+                await db.flush()
 
                 # Enqueue pipeline processing
                 await enqueue_process_email(str(email.id))

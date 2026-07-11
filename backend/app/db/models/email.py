@@ -133,3 +133,27 @@ class EmailReply(Base, TimestampMixin):
     attached_asset_ids: Mapped[list] = mapped_column(JSONB, default=list)
 
     email: Mapped["Email"] = relationship("Email", back_populates="reply", lazy="raise")
+
+
+class ResumeProfile(Base, TimestampMixin):
+    """Structured resume data extracted by AI from a job-application email."""
+    __tablename__ = "resume_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    email_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("emails.id"), nullable=False)
+    attachment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("email_attachments.id"))
+    candidate_name: Mapped[str | None] = mapped_column(String(200))
+    candidate_email: Mapped[str | None] = mapped_column(String(200))
+    candidate_phone: Mapped[str | None] = mapped_column(String(50))
+    education: Mapped[list] = mapped_column(JSONB, default=list)
+    experience: Mapped[list] = mapped_column(JSONB, default=list)
+    skills: Mapped[list] = mapped_column(JSONB, default=list)
+    desired_position: Mapped[str | None] = mapped_column(String(200))
+    expected_salary: Mapped[str | None] = mapped_column(String(100))
+    years_experience: Mapped[int | None] = mapped_column(Integer)
+    summary: Mapped[str | None] = mapped_column(Text)
+    match_score: Mapped[int | None] = mapped_column(SmallInteger)  # 0-100 fit vs. positioning
+    match_notes: Mapped[str | None] = mapped_column(Text)
+    llm_model: Mapped[str | None] = mapped_column(String(100))
+    source: Mapped[str] = mapped_column(String(20), default="attachment")  # attachment | body

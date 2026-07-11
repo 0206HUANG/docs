@@ -89,6 +89,13 @@ async def process_email(
     )
     await audit.log(email.id, "classified", detail={"type": email_type, "urgency": urgency})
 
+    # ── 3a. Resume parsing (job-application emails) ──────────────────────────
+    if email_type == "resume":
+        try:
+            await _parse_resume(db, email, account, llm, llm_config, audit)
+        except Exception as e:
+            logger.error("Resume parse failed email=%s: %s", email.id, e)
+
     # ── 3. RAG retrieval ────────────────────────────────────────────────────
     kb_group_repo = KBGroupRepo(db, tenant_id)
     kb_chunk_repo = KBChunkRepo(db, tenant_id)
@@ -231,3 +238,75 @@ async def _create_ticket(db, email, account, reason, title, priority=1) -> Ticke
     db.add(ticket)
     await db.flush()
     return ticket
+
+
+def _clip(v, n):
+    """Truncate a string to fit a column; pass through non-strings."""
+    return v[:n] if isinstance(v, str) else v
+
+
+async def _parse_resume(db, email, account, llm, llm_config, audit) -> None:
+    """Extract structured resume data from a job-application email's attachment
+    (or body as fallback) and persist a ResumeProfile."""
+    from sqlalchemy import select
+
+    from app.db.models import EmailAttachment, ResumeProfile
+    from app.services.kb.ingestion import _extract_text
+    from app.services.pipeline.resume_parser import parse_resume
+
+    result = await db.execute(
+        select(EmailAttachment).where(EmailAttachment.email_id == email.id)
+    )
+    attachments = result.scalars().all()
+
+    resume_text = ""
+    source = "body"
+    used_att = None
+    for att in attachments:
+        name = (att.filename or "").lower()
+        if att.storage_path and name.endswith((".pdf", ".doc", ".docx", ".txt")):
+            try:
+                with open(att.storage_path, "rb") as fh:
+                    text = _extract_text(fh.read(), att.filename)
+                if text and text.strip():
+                    resume_text, source, used_att = text, "attachment", att
+                    break
+            except Exception as e:
+                logger.warning("Read resume attachment failed %s: %s", att.filename, e)
+
+    if not resume_text.strip():
+        resume_text = f"{email.subject or ''}\n{email.body_text or ''}"
+        source = "body"
+
+    parsed = await parse_resume(
+        llm, resume_text, target_role=account.positioning, model=llm_config.get("model")
+    )
+    if not parsed:
+        return
+
+    profile = ResumeProfile(
+        tenant_id=email.tenant_id,
+        email_id=email.id,
+        attachment_id=used_att.id if used_att else None,
+        candidate_name=_clip(parsed.get("candidate_name"), 200),
+        candidate_email=_clip(parsed.get("candidate_email"), 200),
+        candidate_phone=_clip(parsed.get("candidate_phone"), 50),
+        education=parsed.get("education", []),
+        experience=parsed.get("experience", []),
+        skills=parsed.get("skills", []),
+        desired_position=_clip(parsed.get("desired_position"), 200),
+        expected_salary=_clip(parsed.get("expected_salary"), 100),
+        years_experience=parsed.get("years_experience"),
+        summary=parsed.get("summary"),
+        match_score=parsed.get("match_score"),
+        match_notes=parsed.get("match_notes"),
+        llm_model=parsed.get("llm_model"),
+        source=source,
+    )
+    db.add(profile)
+    await db.flush()
+    await audit.log(email.id, "resume_parsed", detail={
+        "candidate": parsed.get("candidate_name"),
+        "match_score": parsed.get("match_score"),
+        "source": source,
+    })
