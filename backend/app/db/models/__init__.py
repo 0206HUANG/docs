@@ -9,6 +9,7 @@ from app.db.models.workflow import (
     SensitiveWord, EmailTypeStrategy, Ticket, TicketReply,
     Notification, AuditLog, SummaryReport, EmailListRule,
 )
+from app.db.models.campaign import Campaign, CampaignRecipient
 
 __all__ = [
     "Tenant", "Department",
@@ -18,4 +19,5 @@ __all__ = [
     "KBGroup", "KBDocument", "KBChunk", "AssetLibrary",
     "SensitiveWord", "EmailTypeStrategy", "Ticket", "TicketReply",
     "Notification", "AuditLog", "SummaryReport", "EmailListRule",
+    "Campaign", "CampaignRecipient",
 ]

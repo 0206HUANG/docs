@@ -118,6 +118,10 @@ async def poll_inbox(ctx: dict, account_id: str) -> None:
                     ))
                 await db.flush()
 
+                # If this sender is a target of an active campaign, stop its SOP
+                from app.services.campaign import mark_replied
+                await mark_replied(db, account.tenant_id, raw.from_addr)
+
                 # Enqueue pipeline processing
                 await enqueue_process_email(str(email.id))
 
@@ -248,3 +252,10 @@ async def escalate_tickets(ctx: dict) -> None:
     async with AsyncSessionLocal() as db:
         from app.services.escalation import escalate_overdue
         await escalate_overdue(db)
+
+
+async def run_campaigns(ctx: dict) -> None:
+    """Cron: send due SOP steps for running outbound campaigns."""
+    async with AsyncSessionLocal() as db:
+        from app.services.campaign import run_due_recipients
+        await run_due_recipients(db)
