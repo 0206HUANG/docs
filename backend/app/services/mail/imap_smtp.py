@@ -82,7 +82,9 @@ class IMAPSMTPProvider(BaseMailProvider):
             await self.connect()
         if since:
             date_str = since.strftime("%d-%b-%Y")
-            _, data = await self._imap.search(f'SINCE "{date_str}"')
+            # IMAP dates are atoms, NOT quoted-strings — quoting makes Gmail
+            # match nothing. Pass criteria as separate tokens.
+            _, data = await self._imap.search("SINCE", date_str)
         else:
             _, data = await self._imap.search("ALL")
 
@@ -93,15 +95,24 @@ class IMAPSMTPProvider(BaseMailProvider):
         results: list[RawEmail] = []
 
         for uid in msg_ids[-200:]:  # limit batch to 200 most recent
+            uid_str = uid.decode() if isinstance(uid, (bytes, bytearray)) else str(uid)
             try:
-                _, msg_data = await self._imap.fetch(uid, "(RFC822)")
-                raw_bytes = msg_data[1]
+                resp = await self._imap.fetch(uid_str, "(RFC822)")
+                # aioimaplib returns Response(result, lines); the raw RFC822
+                # message is the bytes/bytearray payload — take the largest one.
+                raw_bytes = b""
+                for line in resp.lines:
+                    if isinstance(line, (bytes, bytearray)) and len(line) > len(raw_bytes):
+                        raw_bytes = bytes(line)
+                if len(raw_bytes) < 20:
+                    logger.warning("No RFC822 body for uid=%s", uid_str)
+                    continue
                 msg = email_lib.message_from_bytes(raw_bytes, policy=email_lib.policy.default)
                 parsed = self._parse_message(msg)
                 if parsed:
                     results.append(parsed)
             except Exception as e:
-                logger.warning("Failed to parse email uid=%s: %s", uid, e)
+                logger.warning("Failed to parse email uid=%s: %s", uid_str, e)
 
         return results
 
