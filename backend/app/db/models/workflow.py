@@ -62,6 +62,8 @@ class Ticket(Base, TimestampMixin):
     assigned_to: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    escalation_level: Mapped[int] = mapped_column(SmallInteger, default=0)
+    last_escalated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     notes: Mapped[str | None] = mapped_column(Text)
 
     replies: Mapped[list["TicketReply"]] = relationship("TicketReply", back_populates="ticket", lazy="raise")

@@ -241,3 +241,10 @@ async def poll_all_accounts(ctx: dict) -> None:
     for account in accounts:
         await pool.enqueue_job("poll_inbox", str(account.id))
     logger.info("Queued polling for %d accounts", len(accounts))
+
+
+async def escalate_tickets(ctx: dict) -> None:
+    """Cron: escalate overdue open/claimed tickets and notify admins."""
+    async with AsyncSessionLocal() as db:
+        from app.services.escalation import escalate_overdue
+        await escalate_overdue(db)
