@@ -60,7 +60,7 @@ class WorkerSettings:
     retry_jobs = True
     max_tries = 3
     cron_jobs = [
-        cron(poll_all_accounts, minute={0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55}),
+        cron(poll_all_accounts),  # every minute (second=0) for near-real-time inbox
         cron(escalate_tickets, minute={0, 30}),
         cron(run_campaigns, minute={15, 45}),
         cron(send_scheduled),  # every minute (second=0)

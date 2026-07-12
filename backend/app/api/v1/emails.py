@@ -34,6 +34,23 @@ async def list_emails(
     }
 
 
+@router.post("/sync")
+async def sync_emails(current_user: CurrentUser, db: DB):
+    """Trigger an immediate inbox poll for all active accounts of this tenant."""
+    result = await db.execute(
+        select(EmailAccount).where(
+            EmailAccount.tenant_id == current_user.tenant_id,
+            EmailAccount.is_active == True,
+        )
+    )
+    accounts = result.scalars().all()
+    from app.worker.tasks import get_arq_pool
+    pool = await get_arq_pool()
+    for a in accounts:
+        await pool.enqueue_job("poll_inbox", str(a.id))
+    return {"queued": len(accounts)}
+
+
 @router.get("/{email_id}")
 async def get_email(email_id: str, current_user: CurrentUser, db: DB):
     result = await db.execute(

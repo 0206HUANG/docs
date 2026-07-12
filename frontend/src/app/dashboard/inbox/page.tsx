@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, EmailSummary } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -25,56 +25,125 @@ const URGENCY_COLOR: Record<number, string> = {
   3: "text-red-600",
 };
 
+const POLL_MS = 10000; // auto-refresh every 10s
+
 export default function InboxPage() {
   const [emails, setEmails] = useState<EmailSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const router = useRouter();
+  const seenIds = useRef<Set<string>>(new Set());
+  const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
+
+  async function refresh() {
+    try {
+      const r = await api.emails.list({ limit: 50 });
+      // detect newly-arrived emails to briefly highlight them
+      const fresh = new Set<string>();
+      for (const e of r.items) if (!seenIds.current.has(e.id)) fresh.add(e.id);
+      if (seenIds.current.size > 0 && fresh.size > 0) {
+        setFlashIds(fresh);
+        setTimeout(() => setFlashIds(new Set()), 4000);
+      }
+      r.items.forEach(e => seenIds.current.add(e.id));
+      setEmails(r.items);
+      setTotal(r.total);
+      setLastUpdated(new Date());
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    api.emails.list({ limit: 50 })
-      .then(r => { setEmails(r.items); setTotal(r.total); })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    refresh();
+    const t = setInterval(refresh, POLL_MS);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function syncNow() {
+    setSyncing(true);
+    try {
+      await api.emails.sync();
+      // give the worker a moment to fetch, then poll a few times
+      for (let i = 0; i < 4; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        await refresh();
+      }
+    } catch (e: any) {
+      alert("收取失败: " + e.message);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold">收件箱</h1>
-        <span className="text-sm text-muted-foreground">共 {total} 封</span>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold">收件箱</h1>
+          <span className="text-sm text-slate-400">共 {total} 封</span>
+          <span className="flex items-center gap-1 text-xs text-green-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            实时
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {lastUpdated && (
+            <span className="text-xs text-slate-400">
+              更新于 {lastUpdated.toLocaleTimeString("zh-CN")}
+            </span>
+          )}
+          <button
+            onClick={syncNow}
+            disabled={syncing}
+            className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {syncing ? "收取中..." : "立即收取"}
+          </button>
+        </div>
       </div>
+
       {loading ? (
-        <p className="text-muted-foreground text-sm">加载中...</p>
+        <p className="text-slate-400 text-sm">加载中...</p>
       ) : emails.length === 0 ? (
-        <p className="text-muted-foreground text-sm">暂无邮件</p>
+        <p className="text-slate-400 text-sm">暂无邮件。点击「立即收取」从邮箱拉取,或等待自动同步。</p>
       ) : (
         <div className="space-y-2">
           {emails.map(e => (
             <div
               key={e.id}
-              className="bg-card border rounded-lg p-4 cursor-pointer hover:border-primary/40 transition-colors"
+              className={`bg-card border rounded-lg p-4 cursor-pointer transition-colors ${
+                flashIds.has(e.id) ? "border-green-400 bg-green-50" : "border-slate-200 hover:border-blue-300"
+              }`}
               onClick={() => router.push(`/dashboard/inbox/${e.id}`)}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{e.subject || "(无主题)"}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="font-medium text-sm truncate">
+                    {flashIds.has(e.id) && <span className="text-green-600 mr-1">●</span>}
+                    {e.subject || "(无主题)"}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
                     {e.from_name ? `${e.from_name} <${e.from_addr}>` : e.from_addr}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   {e.received_at && (
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(e.received_at).toLocaleDateString("zh-CN")}
+                    <span className="text-xs text-slate-400">
+                      {new Date(e.received_at).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </span>
                   )}
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
                     {e.has_sensitive && (
                       <span className="px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-700 font-medium">敏感</span>
                     )}
                     {e.email_type && (
-                      <span className="px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground">
+                      <span className="px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-600">
                         {TYPE_LABELS[e.email_type] || e.email_type}
                       </span>
                     )}

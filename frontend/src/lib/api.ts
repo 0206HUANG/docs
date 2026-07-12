@@ -49,6 +49,7 @@ export const api = {
     },
     get: (id: string) => request<EmailDetail>(`/emails/${id}`),
     audit: (id: string) => request<AuditEntry[]>(`/emails/${id}/audit`),
+    sync: () => request<{ queued: number }>("/emails/sync", { method: "POST" }),
   },
 
   tickets: {
