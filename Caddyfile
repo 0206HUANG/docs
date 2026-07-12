@@ -1,0 +1,18 @@
+# {$DOMAIN} is set from the compose env:
+#   - a real domain (e.g. mail.acme.com) → Caddy auto-provisions Let's Encrypt HTTPS
+#   - ":80" (default) → plain HTTP over the server's IP, for quick demos
+#
+# Caddy routes /api/* straight to the backend and everything else to the
+# Next.js frontend. Doing the API routing here (instead of Next.js rewrites)
+# avoids the NEXT_PUBLIC_API_URL being frozen at build time.
+{$DOMAIN} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy app:8000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
