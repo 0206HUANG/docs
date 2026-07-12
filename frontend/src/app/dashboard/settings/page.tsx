@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api, SensitiveWord, EmailStrategy } from "@/lib/api";
+import { api, SensitiveWord, EmailStrategy, ListRule } from "@/lib/api";
 
-type Tab = "llm" | "sensitive" | "strategies";
+type Tab = "llm" | "sensitive" | "strategies" | "lists";
 
 const STRATEGY_OPTIONS = ["auto_send", "draft_review", "human_only", "skip"];
 const STRATEGY_LABELS: Record<string, string> = {
@@ -35,6 +35,8 @@ export default function SettingsPage() {
   const [words, setWords] = useState<SensitiveWord[]>([]);
   const [newWord, setNewWord] = useState({ word: "", category: "custom" });
   const [strategies, setStrategies] = useState<EmailStrategy[]>([]);
+  const [rules, setRules] = useState<ListRule[]>([]);
+  const [newRule, setNewRule] = useState({ list_type: "black", match_type: "email", value: "", reason: "" });
 
   useEffect(() => {
     if (tab === "sensitive") {
@@ -45,6 +47,9 @@ export default function SettingsPage() {
     }
     if (tab === "llm") {
       api.settings.getLLM().then(d => setLlm(l => ({ ...l, provider: d.provider, model: d.model }))).catch(() => {});
+    }
+    if (tab === "lists") {
+      api.listRules.list().then(setRules).catch(console.error);
     }
   }, [tab]);
 
@@ -70,10 +75,23 @@ export default function SettingsPage() {
     await api.settings.updateStrategy(email_type, { send_strategy, tone }).catch(e => alert(e.message));
   }
 
+  async function addRule() {
+    if (!newRule.value.trim()) return;
+    await api.listRules.add(newRule).catch(e => alert(e.message));
+    setNewRule({ list_type: "black", match_type: "email", value: "", reason: "" });
+    api.listRules.list().then(setRules);
+  }
+
+  async function deleteRule(id: string) {
+    await api.listRules.remove(id).catch(e => alert(e.message));
+    setRules(r => r.filter(x => x.id !== id));
+  }
+
   const tabs: { key: Tab; label: string }[] = [
     { key: "llm", label: "AI 配置" },
     { key: "sensitive", label: "敏感词" },
     { key: "strategies", label: "路由策略" },
+    { key: "lists", label: "黑白名单" },
   ];
 
   return (
@@ -241,6 +259,47 @@ export default function SettingsPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === "lists" && (
+        <div className="space-y-4">
+          <div className="bg-white border border-slate-200 rounded-xl p-5">
+            <p className="text-sm font-medium text-slate-700 mb-3">添加黑 / 白名单规则</p>
+            <div className="flex flex-wrap gap-2">
+              <select className="border border-slate-200 rounded-lg px-2 py-2 text-sm" value={newRule.list_type} onChange={e => setNewRule(r => ({ ...r, list_type: e.target.value }))}>
+                <option value="black">黑名单</option>
+                <option value="white">白名单</option>
+              </select>
+              <select className="border border-slate-200 rounded-lg px-2 py-2 text-sm" value={newRule.match_type} onChange={e => setNewRule(r => ({ ...r, match_type: e.target.value }))}>
+                <option value="email">邮箱</option>
+                <option value="domain">域名</option>
+              </select>
+              <input className={inp + " flex-1 min-w-[180px]"} placeholder={newRule.match_type === "email" ? "spammer@example.com" : "example.com"} value={newRule.value} onChange={e => setNewRule(r => ({ ...r, value: e.target.value }))} onKeyDown={e => e.key === "Enter" && addRule()} />
+              <button onClick={addRule} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">添加</button>
+            </div>
+            <p className="text-xs text-slate-400 mt-2">黑名单发件人直接隔离(不调用 AI);白名单跳过钓鱼检测、视为可信。</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-xl p-5">
+            <p className="text-sm font-medium text-slate-700 mb-3">当前规则 ({rules.length})</p>
+            {rules.length === 0 ? (
+              <p className="text-sm text-slate-400">暂无规则</p>
+            ) : (
+              <div className="space-y-2">
+                {rules.map(r => (
+                  <div key={r.id} className="flex items-center gap-2 border-b border-slate-100 py-1.5">
+                    <span className={`text-xs px-2 py-0.5 rounded font-medium ${r.list_type === "black" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                      {r.list_type === "black" ? "黑" : "白"}
+                    </span>
+                    <span className="text-xs text-slate-400">{r.match_type}</span>
+                    <span className="text-sm flex-1">{r.value}</span>
+                    {r.reason && <span className="text-xs text-slate-400">{r.reason}</span>}
+                    <button onClick={() => deleteRule(r.id)} className="text-red-400 hover:text-red-600 text-xs">删除</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

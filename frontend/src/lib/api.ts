@@ -72,6 +72,45 @@ export const api = {
     readAll: () => request("/notifications/read-all", { method: "POST" }),
   },
 
+  resumes: {
+    list: () => request<ResumeProfile[]>("/resumes"),
+    get: (id: string) => request<ResumeProfile>(`/resumes/${id}`),
+  },
+
+  customers: {
+    list: () => request<Customer[]>("/customers"),
+    get: (id: string) => request<CustomerDetail>(`/customers/${id}`),
+  },
+
+  campaigns: {
+    list: () => request<CampaignSummary[]>("/campaigns"),
+    get: (id: string) => request<CampaignDetail>(`/campaigns/${id}`),
+    create: (data: {
+      account_id: string; name: string; subject_template: string; body_template: string;
+      sop_steps: number; sop_interval_hours: number;
+    }) => request<{ id: string }>("/campaigns", { method: "POST", body: JSON.stringify(data) }),
+    addRecipients: (id: string, recipients: { email: string; name?: string }[]) =>
+      request<{ added: number }>(`/campaigns/${id}/recipients`, { method: "POST", body: JSON.stringify({ recipients }) }),
+    start: (id: string) => request(`/campaigns/${id}/start`, { method: "POST" }),
+    pause: (id: string) => request(`/campaigns/${id}/pause`, { method: "POST" }),
+  },
+
+  outbox: {
+    list: () => request<ScheduledEmailT[]>("/outbox"),
+    schedule: (data: {
+      account_id: string; to_addrs: string[]; subject: string; body_text: string;
+      delay_minutes?: number; scheduled_at?: string; track_opens?: boolean;
+    }) => request<{ id: string }>("/outbox", { method: "POST", body: JSON.stringify(data) }),
+    cancel: (id: string) => request(`/outbox/${id}/cancel`, { method: "POST" }),
+  },
+
+  listRules: {
+    list: () => request<ListRule[]>("/settings/list-rules"),
+    add: (data: { list_type: string; match_type: string; value: string; reason?: string }) =>
+      request("/settings/list-rules", { method: "POST", body: JSON.stringify(data) }),
+    remove: (id: string) => request(`/settings/list-rules/${id}`, { method: "DELETE" }),
+  },
+
   stats: () => request<{
     emails_today: number;
     emails_week: number;
@@ -197,5 +236,97 @@ export interface EmailStrategy {
   email_type: string;
   send_strategy: string;
   tone: string;
+  is_active: boolean;
+}
+
+export interface ResumeProfile {
+  id: string;
+  email_id: string;
+  candidate_name: string | null;
+  candidate_email: string | null;
+  candidate_phone: string | null;
+  education: { school?: string; degree?: string; major?: string; year?: string }[];
+  experience: { company?: string; title?: string; duration?: string; summary?: string }[];
+  skills: string[];
+  desired_position: string | null;
+  expected_salary: string | null;
+  years_experience: number | null;
+  summary: string | null;
+  match_score: number | null;
+  match_notes: string | null;
+  source: string;
+  created_at: string | null;
+}
+
+export interface Customer {
+  id: string;
+  email: string;
+  name: string | null;
+  company: string | null;
+  email_count: number;
+  first_seen: string | null;
+  last_seen: string | null;
+  status: string;
+  importance: number;
+  tags: string[];
+  summary: string | null;
+  notes: string | null;
+}
+
+export interface CustomerDetail extends Customer {
+  recent_emails: { id: string; subject: string | null; received_at: string | null; snippet: string }[];
+}
+
+export interface CampaignSummary {
+  id: string;
+  name: string;
+  status: string;
+  sop_steps: number;
+  sop_interval_hours: number;
+  recipients: Record<string, number>;
+}
+
+export interface CampaignRecipientT {
+  id: string;
+  email: string;
+  name: string | null;
+  current_step: number;
+  status: string;
+  last_sent_at: string | null;
+  next_send_at: string | null;
+}
+
+export interface CampaignDetail {
+  id: string;
+  name: string;
+  status: string;
+  subject_template: string;
+  body_template: string;
+  sop_steps: number;
+  sop_interval_hours: number;
+  recipients: CampaignRecipientT[];
+}
+
+export interface ScheduledEmailT {
+  id: string;
+  account_id: string;
+  to_addrs: string[];
+  subject: string;
+  scheduled_at: string | null;
+  status: string;
+  sent_at: string | null;
+  error_msg: string | null;
+  track_opens: boolean;
+  open_count: number;
+  first_opened_at: string | null;
+  last_opened_at: string | null;
+}
+
+export interface ListRule {
+  id: string;
+  list_type: string;
+  match_type: string;
+  value: string;
+  reason: string | null;
   is_active: boolean;
 }
