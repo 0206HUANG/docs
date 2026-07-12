@@ -68,6 +68,34 @@ async def get_email(email_id: str, current_user: CurrentUser, db: DB):
     return _email_detail(email)
 
 
+@router.delete("/{email_id}")
+async def delete_email(email_id: str, current_user: CurrentUser, db: DB):
+    """Soft-delete the email locally and remove it from Gmail (IMAP) too."""
+    result = await db.execute(
+        select(Email)
+        .where(Email.id == uuid.UUID(email_id), Email.tenant_id == current_user.tenant_id)
+        .options(selectinload(Email.account))
+    )
+    email = result.scalar_one_or_none()
+    if not email:
+        raise NotFoundError("Email")
+
+    gmail_removed = False
+    account = email.account
+    if account and account.is_active:
+        from app.services.mail import get_mail_provider
+        try:
+            provider = get_mail_provider(account)
+            gmail_removed = await provider.delete_message(email.message_id)
+            await provider.disconnect()
+        except Exception:
+            gmail_removed = False  # local delete still proceeds
+
+    email.is_deleted = True
+    await db.commit()
+    return {"deleted": True, "gmail_removed": gmail_removed}
+
+
 @router.get("/{email_id}/audit")
 async def get_audit(email_id: str, current_user: CurrentUser, db: DB):
     result = await db.execute(

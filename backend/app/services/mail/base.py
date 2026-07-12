@@ -50,3 +50,6 @@ class BaseMailProvider(ABC):
 
     @abstractmethod
     async def test_connection(self) -> bool: ...
+
+    @abstractmethod
+    async def delete_message(self, message_id: str) -> bool: ...

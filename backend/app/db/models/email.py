@@ -72,6 +72,7 @@ class Email(Base, TimestampMixin):
     body_html: Mapped[str | None] = mapped_column(Text)
     language: Mapped[str | None] = mapped_column(String(10))
     received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     account: Mapped["EmailAccount"] = relationship("EmailAccount", back_populates="emails", lazy="raise")
     thread: Mapped["EmailThread | None"] = relationship("EmailThread", back_populates="emails", lazy="raise")

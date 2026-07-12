@@ -81,6 +81,21 @@ export default function InboxPage() {
     }
   }
 
+  async function remove(id: string) {
+    if (!confirm("删除这封邮件?会同时从 Gmail 收件箱移除。")) return;
+    // optimistic removal
+    setEmails(list => list.filter(x => x.id !== id));
+    try {
+      const r = await api.emails.remove(id);
+      if (!r.gmail_removed) {
+        // local delete succeeded; Gmail removal may have been skipped (inactive account)
+      }
+    } catch (e: any) {
+      alert("删除失败: " + e.message);
+      refresh();
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -117,7 +132,7 @@ export default function InboxPage() {
           {emails.map(e => (
             <div
               key={e.id}
-              className={`bg-card border rounded-lg p-4 cursor-pointer transition-colors ${
+              className={`group bg-card border rounded-lg p-4 cursor-pointer transition-colors ${
                 flashIds.has(e.id) ? "border-green-400 bg-green-50" : "border-slate-200 hover:border-blue-300"
               }`}
               onClick={() => router.push(`/dashboard/inbox/${e.id}`)}
@@ -152,6 +167,13 @@ export default function InboxPage() {
                         {e.urgency === 3 ? "紧急" : e.urgency === 2 ? "中" : "低"}
                       </span>
                     )}
+                    <button
+                      onClick={ev => { ev.stopPropagation(); remove(e.id); }}
+                      className="ml-1 text-xs text-slate-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="删除(同步到 Gmail)"
+                    >
+                      删除
+                    </button>
                   </div>
                 </div>
               </div>

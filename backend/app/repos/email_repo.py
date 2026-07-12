@@ -69,7 +69,7 @@ class EmailRepo(TenantBaseRepo[Email]):
     ) -> tuple[list[Email], int]:
         q = (
             self._base_query()
-            .where(Email.direction == "inbound")
+            .where(Email.direction == "inbound", Email.is_deleted == False)
             .options(
                 selectinload(Email.classification),
                 selectinload(Email.reply),

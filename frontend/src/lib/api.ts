@@ -50,6 +50,7 @@ export const api = {
     get: (id: string) => request<EmailDetail>(`/emails/${id}`),
     audit: (id: string) => request<AuditEntry[]>(`/emails/${id}/audit`),
     sync: () => request<{ queued: number }>("/emails/sync", { method: "POST" }),
+    remove: (id: string) => request<{ deleted: boolean; gmail_removed: boolean }>(`/emails/${id}`, { method: "DELETE" }),
   },
 
   tickets: {

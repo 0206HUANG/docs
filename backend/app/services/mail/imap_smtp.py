@@ -189,6 +189,30 @@ class IMAPSMTPProvider(BaseMailProvider):
     def _split_addrs(raw: str) -> list[str]:
         return [a.strip() for a in raw.split(",") if a.strip()]
 
+    async def delete_message(self, message_id: str) -> bool:
+        """Remove a message from the mailbox by its Message-ID (marks \\Deleted
+        + expunge, which drops it from INBOX). Returns True if something matched."""
+        if not self._imap:
+            await self.connect()
+        mid = (message_id or "").strip()
+        if not mid:
+            return False
+        # search by header; try with and without angle brackets
+        found = []
+        for needle in (mid, mid.strip("<>")):
+            resp = await self._imap.search("HEADER", "Message-ID", needle)
+            if resp.lines and resp.lines[0]:
+                found = resp.lines[0].split()
+                if found:
+                    break
+        if not found:
+            return False
+        for seq in found:
+            s = seq.decode() if isinstance(seq, (bytes, bytearray)) else str(seq)
+            await self._imap.store(s, "+FLAGS", "(\\Deleted)")
+        await self._imap.expunge()
+        return True
+
     async def send(self, msg: OutboundEmail) -> str:
         mime = MIMEMultipart("mixed") if msg.attachments else MIMEMultipart("alternative")
         from_field = f"{msg.from_name} <{msg.from_addr}>" if msg.from_name else msg.from_addr
