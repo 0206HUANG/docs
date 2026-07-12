@@ -6,18 +6,20 @@ from app.services.llm.openai_provider import DeepSeekProvider, OpenAIProvider
 # OpenAI-compatible providers → (base_url, default_model).
 # Most Chinese LLM vendors expose an OpenAI-compatible endpoint, so a single
 # OpenAIProvider pointed at the right base_url covers them all.
+# base_url + default_model verified against each vendor's official OpenAI-compatible
+# docs (2026-07). Model versions drift — users can override in settings.
 OPENAI_COMPATIBLE_PROVIDERS: dict[str, tuple[str, str]] = {
     "openai":    ("",                                                    "gpt-4o-mini"),
-    "deepseek":  ("https://api.deepseek.com/v1",                         "deepseek-chat"),
-    "doubao":    ("https://ark.cn-beijing.volces.com/api/v3",            "doubao-pro-32k"),      # 字节·豆包(火山方舟)
-    "qwen":      ("https://dashscope.aliyuncs.com/compatible-mode/v1",   "qwen-plus"),           # 阿里·通义千问
-    "glm":       ("https://open.bigmodel.cn/api/paas/v4",                "glm-4-flash"),         # 智谱·GLM
-    "kimi":      ("https://api.moonshot.cn/v1",                          "moonshot-v1-8k"),      # 月之暗面·Kimi
-    "minimax":   ("https://api.minimaxi.com/v1",                         "abab6.5s-chat"),       # MiniMax
-    "hunyuan":   ("https://api.hunyuan.cloud.tencent.com/v1",            "hunyuan-standard"),    # 腾讯·混元
-    "baichuan":  ("https://api.baichuan-ai.com/v1",                      "Baichuan4"),           # 百川
-    "spark":     ("https://spark-api-open.xf-yun.com/v1",                "generalv3.5"),         # 讯飞·星火
-    "stepfun":   ("https://api.stepfun.com/v1",                          "step-1-8k"),           # 阶跃星辰·Step
+    "deepseek":  ("https://api.deepseek.com/v1",                         "deepseek-chat"),               # 深度求索(deepseek-chat 2026-07-24 EOL→可改 deepseek-v4-flash)
+    "doubao":    ("https://ark.cn-beijing.volces.com/api/v3",            "doubao-1-5-pro-32k-250115"),   # 字节·豆包(火山方舟);model 需带日期后缀或用接入点 ep-xxx
+    "qwen":      ("https://dashscope.aliyuncs.com/compatible-mode/v1",   "qwen-plus"),                   # 阿里·通义千问
+    "glm":       ("https://open.bigmodel.cn/api/paas/v4/",               "glm-4.5-flash"),               # 智谱·GLM
+    "kimi":      ("https://api.moonshot.cn/v1",                          "moonshot-v1-8k"),              # 月之暗面·Kimi
+    "minimax":   ("https://api.minimaxi.com/v1",                         "MiniMax-M3"),                  # MiniMax(国内区,key 需同区)
+    "hunyuan":   ("https://api.hunyuan.cloud.tencent.com/v1",            "hunyuan-turbos-latest"),       # 腾讯·混元
+    "baichuan":  ("https://api.baichuan-ai.com/v1",                      "Baichuan4-Turbo"),             # 百川(model 区分大小写)
+    "spark":     ("https://spark-api-open.xf-yun.com/v1",                "4.0Ultra"),                    # 讯飞·星火(api_key 格式 APIKey:APISecret)
+    "stepfun":   ("https://api.stepfun.com/v1",                          "step-1-8k"),                   # 阶跃星辰·Step
 }
 
 

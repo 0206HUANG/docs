@@ -22,15 +22,21 @@ const PROVIDER_MODELS: Record<string, string> = {
   openai: "gpt-4o-mini",
   anthropic: "claude-3-5-sonnet-20241022",
   deepseek: "deepseek-chat",
-  doubao: "doubao-pro-32k",
+  doubao: "doubao-1-5-pro-32k-250115",
   qwen: "qwen-plus",
-  glm: "glm-4-flash",
+  glm: "glm-4.5-flash",
   kimi: "moonshot-v1-8k",
-  minimax: "abab6.5s-chat",
-  hunyuan: "hunyuan-standard",
-  baichuan: "Baichuan4",
-  spark: "generalv3.5",
+  minimax: "MiniMax-M3",
+  hunyuan: "hunyuan-turbos-latest",
+  baichuan: "Baichuan4-Turbo",
+  spark: "4.0Ultra",
   stepfun: "step-1-8k",
+};
+// provider-specific配置提示
+const PROVIDER_HINTS: Record<string, string> = {
+  doubao: "豆包模型名需带日期后缀(如 -250115)或填「接入点 ID」ep-xxx,请在火山方舟控制台获取。",
+  spark: "讯飞星火的 API Key 需填「APIKey:APISecret」格式(用冒号拼接)。",
+  minimax: "MiniMax 国内区 key 需搭配 minimaxi.com,不能与国际区混用。",
 };
 
 const STRATEGY_OPTIONS = ["auto_send", "draft_review", "human_only", "skip"];
@@ -61,6 +67,8 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("llm");
   const [llm, setLlm] = useState({ provider: "openai", api_key_enc: "", model: "gpt-4o-mini" });
   const [llmSaved, setLlmSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; model?: string; reply?: string; error?: string } | null>(null);
   const [words, setWords] = useState<SensitiveWord[]>([]);
   const [newWord, setNewWord] = useState({ word: "", category: "custom" });
   const [strategies, setStrategies] = useState<EmailStrategy[]>([]);
@@ -86,6 +94,19 @@ export default function SettingsPage() {
     await api.settings.saveLLM(llm).catch(e => alert(e.message));
     setLlmSaved(true);
     setTimeout(() => setLlmSaved(false), 2000);
+  }
+
+  async function testConnection() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await api.settings.testLLM({ provider: llm.provider, api_key: llm.api_key_enc, model: llm.model });
+      setTestResult(r);
+    } catch (e: any) {
+      setTestResult({ success: false, error: e.message });
+    } finally {
+      setTesting(false);
+    }
   }
 
   async function addWord() {
@@ -158,6 +179,9 @@ export default function SettingsPage() {
               {PROVIDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             <p className="text-xs text-slate-400 mt-1">切换提供商会自动填入默认模型,可再手动修改。国产模型均走 OpenAI 兼容接口。</p>
+            {PROVIDER_HINTS[llm.provider] && (
+              <p className="text-xs text-amber-600 mt-1">⚠️ {PROVIDER_HINTS[llm.provider]}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">API Key</label>
@@ -179,12 +203,28 @@ export default function SettingsPage() {
               placeholder="gpt-4o-mini"
             />
           </div>
-          <button
-            onClick={saveLLM}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-          >
-            {llmSaved ? "已保存 ✓" : "保存"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={saveLLM}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              {llmSaved ? "已保存 ✓" : "保存"}
+            </button>
+            <button
+              onClick={testConnection}
+              disabled={testing || !llm.api_key_enc}
+              className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+            >
+              {testing ? "测试中..." : "测试连接"}
+            </button>
+          </div>
+          {testResult && (
+            <div className={`rounded-lg p-3 text-sm ${testResult.success ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
+              {testResult.success
+                ? `✅ 适配成功!模型 ${testResult.model} 已响应:「${testResult.reply}」`
+                : `❌ 适配失败:${testResult.error}`}
+            </div>
+          )}
         </div>
       )}
 

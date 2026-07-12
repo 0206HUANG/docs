@@ -170,6 +170,39 @@ async def get_llm_config(current_user: CurrentUser, db: DB):
     return {k: ("***" if "key" in k else v) for k, v in cfg.items()}
 
 
+@router.post("/llm/test")
+async def test_llm_config(body: dict, current_user: CurrentUser, db: DB):
+    """Live-test a provider/model/key combo with one tiny chat call.
+    Uses the key from the request body (plaintext) if given, else the saved one."""
+    _require_admin(current_user)
+    from app.services.llm import get_llm_provider
+    from app.services.llm.base import LLMMessage
+
+    provider = body.get("provider")
+    model = body.get("model") or None
+    api_key = body.get("api_key") or ""
+
+    if not api_key:
+        # fall back to the saved (encrypted) key for this tenant
+        from app.db.models import Tenant
+        tenant = (await db.execute(select(Tenant).where(Tenant.id == current_user.tenant_id))).scalar_one_or_none()
+        saved = (tenant.settings or {}).get("llm_config", {}) if tenant else {}
+        api_key = saved.get("api_key_enc", "")
+        if not api_key:
+            return {"success": False, "error": "未提供 API Key(也没有已保存的配置)"}
+
+    cfg = {"provider": provider, "api_key_enc": api_key, "model": model}
+    try:
+        llm = get_llm_provider(cfg)
+        resp = await llm.chat(
+            [LLMMessage(role="user", content="请只回复两个字:成功")],
+            model=model, temperature=0, max_tokens=20,
+        )
+        return {"success": True, "model": resp.model, "reply": (resp.content or "").strip()[:60]}
+    except Exception as e:
+        return {"success": False, "error": f"{type(e).__name__}: {str(e)[:280]}"}
+
+
 @router.put("/llm")
 async def update_llm_config(body: dict, current_user: CurrentUser, db: DB):
     _require_admin(current_user)

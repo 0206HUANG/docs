@@ -140,6 +140,9 @@ export const api = {
     getLLM: () => request<{ provider: string; model: string }>("/settings/llm"),
     saveLLM: (data: { provider: string; api_key_enc: string; model: string }) =>
       request("/settings/llm", { method: "PUT", body: JSON.stringify(data) }),
+    testLLM: (data: { provider: string; api_key: string; model: string }) =>
+      request<{ success: boolean; model?: string; reply?: string; error?: string }>(
+        "/settings/llm/test", { method: "POST", body: JSON.stringify(data) }),
   },
 
   createAccount: (data: {
