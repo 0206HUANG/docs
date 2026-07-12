@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, Account, CampaignDetail, CampaignSummary } from "@/lib/api";
+import { LiveBadge } from "@/lib/useLivePolling";
 
 const STATUS_STYLE: Record<string, string> = {
   draft: "bg-slate-100 text-slate-600",
@@ -18,8 +19,14 @@ export default function CampaignsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [showCreate, setShowCreate] = useState(false);
 
-  const load = () => api.campaigns.list().then(setCampaigns).catch(console.error);
-  useEffect(() => { load(); api.accounts.list().then(setAccounts).catch(() => {}); }, []);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const load = () => api.campaigns.list().then(c => { setCampaigns(c); setLastUpdated(new Date()); }).catch(console.error);
+  useEffect(() => {
+    load();
+    api.accounts.list().then(setAccounts).catch(() => {});
+    const t = setInterval(load, 10000);
+    return () => clearInterval(t);
+  }, []);
 
   const openDetail = async (id: string) => setDetail(await api.campaigns.get(id));
   async function toggle(c: CampaignSummary) {
@@ -32,7 +39,10 @@ export default function CampaignsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold">营销活动 / 主动发件</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold">营销活动 / 主动发件</h1>
+          <LiveBadge lastUpdated={lastUpdated} />
+        </div>
         <button onClick={() => setShowCreate(true)} className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700">
           + 新建活动
         </button>

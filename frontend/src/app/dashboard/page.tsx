@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useLivePolling, LiveBadge } from "@/lib/useLivePolling";
 
 type Stats = {
   emails_today: number;
@@ -11,13 +12,12 @@ type Stats = {
 };
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
+  const { data: stats, lastUpdated } = useLivePolling<Stats>(() => api.stats(), 10000);
   const [user, setUser] = useState<{ name: string; email: string; roles: string[] } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     api.me().then(setUser).catch(() => {});
-    api.stats().then(setStats).catch(e => setError(e.message));
   }, []);
 
   const autoRate = stats && stats.emails_week > 0
@@ -27,9 +27,12 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-slate-900">
-          {user ? `你好，${user.name}` : "概览"}
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold text-slate-900">
+            {user ? `你好，${user.name}` : "概览"}
+          </h1>
+          <LiveBadge lastUpdated={lastUpdated} />
+        </div>
         {user && (
           <p className="text-sm text-slate-500 mt-0.5">
             {user.email} · {user.roles.join(", ")}

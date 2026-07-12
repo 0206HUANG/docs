@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, Account, ScheduledEmailT } from "@/lib/api";
+import { LiveBadge } from "@/lib/useLivePolling";
 
 const STATUS_STYLE: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
@@ -21,8 +22,14 @@ export default function OutboxPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [showCreate, setShowCreate] = useState(false);
 
-  const load = () => api.outbox.list().then(setItems).catch(console.error);
-  useEffect(() => { load(); api.accounts.list().then(setAccounts).catch(() => {}); }, []);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const load = () => api.outbox.list().then(i => { setItems(i); setLastUpdated(new Date()); }).catch(console.error);
+  useEffect(() => {
+    load();
+    api.accounts.list().then(setAccounts).catch(() => {});
+    const t = setInterval(load, 10000);
+    return () => clearInterval(t);
+  }, []);
 
   async function cancel(id: string) {
     try { await api.outbox.cancel(id); load(); } catch (e: any) { alert(e.message); }
@@ -31,7 +38,10 @@ export default function OutboxPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold">定时发送</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold">定时发送</h1>
+          <LiveBadge lastUpdated={lastUpdated} />
+        </div>
         <button onClick={() => setShowCreate(true)} className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700">
           + 定时发送
         </button>

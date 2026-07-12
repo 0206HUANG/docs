@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api, Ticket } from "@/lib/api";
+import { LiveBadge } from "@/lib/useLivePolling";
 
 const STATUS_STYLES: Record<string, string> = {
   open: "bg-blue-100 text-blue-700",
@@ -14,11 +15,17 @@ export default function TicketsPage() {
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState<Ticket | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const load = () =>
-    api.tickets.list(filter || undefined).then(setTickets).catch(console.error);
+    api.tickets.list(filter || undefined).then(t => { setTickets(t); setLastUpdated(new Date()); }).catch(console.error);
 
-  useEffect(() => { load(); }, [filter]);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 10000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
 
   async function handleClaim(id: string) {
     await api.tickets.claim(id).catch(console.error);
@@ -43,7 +50,10 @@ export default function TicketsPage() {
     <div className="flex gap-6 h-full">
       <div className="w-80 shrink-0">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-xl font-semibold">工单</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-semibold">工单</h1>
+            <LiveBadge lastUpdated={lastUpdated} />
+          </div>
           <select
             className="text-xs border rounded-md px-2 py-1"
             value={filter}
