@@ -7,8 +7,10 @@ class OpenAIProvider(BaseLLMProvider):
     DEFAULT_MODEL = "gpt-4o-mini"
     DEFAULT_EMBED_MODEL = "text-embedding-3-small"
 
-    def __init__(self, api_key: str, base_url: str | None = None):
+    def __init__(self, api_key: str, base_url: str | None = None, default_model: str | None = None):
         self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        if default_model:
+            self.DEFAULT_MODEL = default_model  # per-provider fallback when model unset
 
     async def chat(
         self,

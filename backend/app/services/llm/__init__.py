@@ -1,49 +1,64 @@
 from app.core.security import decrypt_value
-from app.services.llm.base import BaseLLMProvider
 from app.services.llm.anthropic_provider import AnthropicProvider
-from app.services.llm.openai_provider import OpenAIProvider, DeepSeekProvider
+from app.services.llm.base import BaseLLMProvider
+from app.services.llm.openai_provider import DeepSeekProvider, OpenAIProvider
+
+# OpenAI-compatible providers → (base_url, default_model).
+# Most Chinese LLM vendors expose an OpenAI-compatible endpoint, so a single
+# OpenAIProvider pointed at the right base_url covers them all.
+OPENAI_COMPATIBLE_PROVIDERS: dict[str, tuple[str, str]] = {
+    "openai":    ("",                                                    "gpt-4o-mini"),
+    "deepseek":  ("https://api.deepseek.com/v1",                         "deepseek-chat"),
+    "doubao":    ("https://ark.cn-beijing.volces.com/api/v3",            "doubao-pro-32k"),      # 字节·豆包(火山方舟)
+    "qwen":      ("https://dashscope.aliyuncs.com/compatible-mode/v1",   "qwen-plus"),           # 阿里·通义千问
+    "glm":       ("https://open.bigmodel.cn/api/paas/v4",                "glm-4-flash"),         # 智谱·GLM
+    "kimi":      ("https://api.moonshot.cn/v1",                          "moonshot-v1-8k"),      # 月之暗面·Kimi
+    "minimax":   ("https://api.minimaxi.com/v1",                         "abab6.5s-chat"),       # MiniMax
+    "hunyuan":   ("https://api.hunyuan.cloud.tencent.com/v1",            "hunyuan-standard"),    # 腾讯·混元
+    "baichuan":  ("https://api.baichuan-ai.com/v1",                      "Baichuan4"),           # 百川
+    "spark":     ("https://spark-api-open.xf-yun.com/v1",                "generalv3.5"),         # 讯飞·星火
+    "stepfun":   ("https://api.stepfun.com/v1",                          "step-1-8k"),           # 阶跃星辰·Step
+}
+
+
+def _decrypt(enc: str) -> str:
+    try:
+        return decrypt_value(enc) if enc else ""
+    except Exception:
+        return enc  # plaintext fallback for dev
 
 
 def get_llm_provider(llm_config: dict) -> BaseLLMProvider:
-    """Factory: build provider from tenant.settings['llm_config'] dict."""
+    """Build a chat provider from tenant.settings['llm_config']."""
     provider_name = llm_config.get("provider", "openai")
-    api_key_enc = llm_config.get("api_key_enc", "")
-    try:
-        api_key = decrypt_value(api_key_enc) if api_key_enc else ""
-    except Exception:
-        api_key = api_key_enc  # plaintext fallback for dev
+    api_key = _decrypt(llm_config.get("api_key_enc", ""))
 
     if provider_name == "anthropic":
         return AnthropicProvider(api_key=api_key)
-    elif provider_name == "deepseek":
-        return DeepSeekProvider(api_key=api_key)
-    else:
-        base_url = llm_config.get("base_url")
-        return OpenAIProvider(api_key=api_key, base_url=base_url)
+
+    if provider_name in OPENAI_COMPATIBLE_PROVIDERS:
+        base_url, default_model = OPENAI_COMPATIBLE_PROVIDERS[provider_name]
+        return OpenAIProvider(api_key=api_key, base_url=base_url or None, default_model=default_model)
+
+    # unknown provider: honor an explicit base_url, else default OpenAI
+    return OpenAIProvider(api_key=api_key, base_url=llm_config.get("base_url"))
 
 
 def get_embed_provider(llm_config: dict) -> BaseLLMProvider:
     """
-    Build an embedding provider.
-
-    OpenAI (and compatible gateways) expose an embeddings endpoint, so they are
-    used directly. DeepSeek and Anthropic do NOT provide embeddings — for those,
-    and for explicit provider=="local", fall back to the API-free local hash
-    embedder so retrieval still works. An explicit embed_config overrides all.
+    Build an embedding provider. Only OpenAI's endpoint (or an explicit
+    embed_config pointing at an OpenAI-compatible embedding API) is used for
+    real semantic vectors; every other chat provider — DeepSeek, Anthropic and
+    all the Chinese vendors, several of which have no embedding endpoint — falls
+    back to the API-free local lexical embedder so RAG still works.
     """
     embed_config = llm_config.get("embed_config", llm_config)
-    embed_provider = embed_config.get(
-        "embed_provider", llm_config.get("provider", "openai")
-    )
+    embed_provider = embed_config.get("embed_provider", llm_config.get("provider", "openai"))
 
-    if embed_provider in ("deepseek", "anthropic", "local"):
+    if embed_provider != "openai":
         from app.services.llm.local_embed import LocalHashEmbedProvider
         return LocalHashEmbedProvider()
 
-    api_key_enc = embed_config.get("embed_api_key_enc", embed_config.get("api_key_enc", ""))
-    try:
-        api_key = decrypt_value(api_key_enc) if api_key_enc else ""
-    except Exception:
-        api_key = api_key_enc
+    api_key = _decrypt(embed_config.get("embed_api_key_enc", embed_config.get("api_key_enc", "")))
     base_url = embed_config.get("embed_base_url")
     return OpenAIProvider(api_key=api_key, base_url=base_url)

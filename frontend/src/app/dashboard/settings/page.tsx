@@ -4,6 +4,35 @@ import { api, SensitiveWord, EmailStrategy, ListRule } from "@/lib/api";
 
 type Tab = "llm" | "sensitive" | "strategies" | "lists";
 
+const PROVIDER_OPTIONS = [
+  { value: "openai", label: "OpenAI (GPT)" },
+  { value: "anthropic", label: "Anthropic (Claude)" },
+  { value: "deepseek", label: "DeepSeek 深度求索" },
+  { value: "doubao", label: "豆包 Doubao(字节·火山方舟)" },
+  { value: "qwen", label: "通义千问 Qwen(阿里)" },
+  { value: "glm", label: "智谱 GLM" },
+  { value: "kimi", label: "Kimi(月之暗面)" },
+  { value: "minimax", label: "MiniMax" },
+  { value: "hunyuan", label: "腾讯混元 Hunyuan" },
+  { value: "baichuan", label: "百川 Baichuan" },
+  { value: "spark", label: "讯飞星火 Spark" },
+  { value: "stepfun", label: "阶跃星辰 Step" },
+];
+const PROVIDER_MODELS: Record<string, string> = {
+  openai: "gpt-4o-mini",
+  anthropic: "claude-3-5-sonnet-20241022",
+  deepseek: "deepseek-chat",
+  doubao: "doubao-pro-32k",
+  qwen: "qwen-plus",
+  glm: "glm-4-flash",
+  kimi: "moonshot-v1-8k",
+  minimax: "abab6.5s-chat",
+  hunyuan: "hunyuan-standard",
+  baichuan: "Baichuan4",
+  spark: "generalv3.5",
+  stepfun: "step-1-8k",
+};
+
 const STRATEGY_OPTIONS = ["auto_send", "draft_review", "human_only", "skip"];
 const STRATEGY_LABELS: Record<string, string> = {
   auto_send: "自动发送",
@@ -121,12 +150,14 @@ export default function SettingsPage() {
             <select
               className={inp}
               value={llm.provider}
-              onChange={e => setLlm(l => ({ ...l, provider: e.target.value }))}
+              onChange={e => {
+                const p = e.target.value;
+                setLlm(l => ({ ...l, provider: p, model: PROVIDER_MODELS[p] || l.model }));
+              }}
             >
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic (Claude)</option>
-              <option value="deepseek">DeepSeek</option>
+              {PROVIDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            <p className="text-xs text-slate-400 mt-1">切换提供商会自动填入默认模型,可再手动修改。国产模型均走 OpenAI 兼容接口。</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">API Key</label>
