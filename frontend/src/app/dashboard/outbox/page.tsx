@@ -93,8 +93,9 @@ export default function OutboxPage() {
 }
 
 function CreateModal({ accounts, onClose, onDone }: { accounts: Account[]; onClose: () => void; onDone: () => void }) {
+  const usable = accounts.filter(a => a.is_active);
   const [form, setForm] = useState({
-    account_id: accounts[0]?.id || "", to: "", subject: "", body_text: "",
+    account_id: usable[0]?.id || "", to: "", subject: "", body_text: "",
     delay_minutes: 5, track_opens: true,
   });
   const [saving, setSaving] = useState(false);
@@ -122,7 +123,8 @@ function CreateModal({ accounts, onClose, onDone }: { accounts: Account[]; onClo
         <div className="space-y-3">
           <F label="发送邮箱">
             <select className={inp} value={form.account_id} onChange={e => setForm(f => ({ ...f, account_id: e.target.value }))}>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.email_address}</option>)}
+              {usable.length === 0 && <option value="">（无已启用邮箱,请先在「邮箱账号」启用）</option>}
+              {usable.map(a => <option key={a.id} value={a.id}>{a.email_address}</option>)}
             </select>
           </F>
           <F label="收件人（逗号分隔）"><input className={inp} value={form.to} onChange={e => setForm(f => ({ ...f, to: e.target.value }))} placeholder="a@x.com, b@y.com" /></F>

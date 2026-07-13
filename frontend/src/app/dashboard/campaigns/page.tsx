@@ -102,8 +102,9 @@ export default function CampaignsPage() {
 }
 
 function CreateModal({ accounts, onClose, onDone }: { accounts: Account[]; onClose: () => void; onDone: () => void }) {
+  const usable = accounts.filter(a => a.is_active);
   const [form, setForm] = useState({
-    account_id: accounts[0]?.id || "", name: "", subject_template: "", body_template: "",
+    account_id: usable[0]?.id || "", name: "", subject_template: "", body_template: "",
     sop_steps: 2, sop_interval_hours: 72,
   });
   const [recipients, setRecipients] = useState("");
@@ -129,7 +130,8 @@ function CreateModal({ accounts, onClose, onDone }: { accounts: Account[]; onClo
         <div className="space-y-3">
           <F label="发送邮箱">
             <select className={inp} value={form.account_id} onChange={e => setForm(f => ({ ...f, account_id: e.target.value }))}>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.email_address}</option>)}
+              {usable.length === 0 && <option value="">（无已启用邮箱,请先在「邮箱账号」启用）</option>}
+              {usable.map(a => <option key={a.id} value={a.id}>{a.email_address}</option>)}
             </select>
           </F>
           <F label="活动名称"><input className={inp} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="例:Q3 客户开发" /></F>
